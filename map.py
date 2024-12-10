@@ -1,8 +1,9 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import heapq
 
-# definisi
+# definisi graf
 graph = {
     'Buyut Sutarji': {'Kakek Jais': 10, 'Kakek Suwito': 15},
     'Kakek Jais': {'Pak Joko': 5, 'Pak Toni': 12},
@@ -30,6 +31,15 @@ family_info = {
     'Pakde Sunaryo': {'level': 3, 'menu': 'Gado-Gado', 'pendapatan': 5_000_000, 'anak': 0}
 }
 
+# informasi kendaraan
+vehicles = {
+    'car': 60,  
+    'motorcycle': 40,
+    'bicycle': 15,
+    'walk': 5
+}
+
+# algoritma Dijkstra
 def dijkstra(graph, start):
     distances = {node: float('inf') for node in graph}
     distances[start] = 0
@@ -51,6 +61,7 @@ def dijkstra(graph, start):
     
     return distances, path
 
+# perhitungan THR
 def calculate_thr(family_info):
     thr_data = {}
     for family, info in family_info.items():
@@ -60,65 +71,114 @@ def calculate_thr(family_info):
             thr_data[family] = 0
     return thr_data
 
-def create_schedule(graph, route, family_info):
+# jadwal kunjungan
+def create_schedule(graph, route, family_info, vehicle_type):
     schedule = []
     current_time = 0  
-    
+    vehicle_speed = vehicles[vehicle_type] * 1000 / 60  
+
     for i, house in enumerate(route):
-        travel_time = graph[route[i - 1]].get(house, 0) if i > 0 else 0
-        visit_time = 30 if family_info[house]['level'] == 0 else 15
-        
+        travel_time = 0
+        if i > 0:  
+            distance = graph[route[i - 1]].get(house, 0)  
+            travel_time = distance / vehicle_speed  
+
+        visit_time = 30 if family_info[house]['level'] == 0 else 15 
+
         current_time += travel_time
-        arrival_time = f"{current_time // 60:02}:{current_time % 60:02}" 
+        arrival_time = f"{int(current_time // 60):02}:{int(current_time % 60):02}"  
         current_time += visit_time
-        
+
         schedule.append({
             'house': house,
             'arrival_time': arrival_time,
-            'menu': family_info[house]['menu']
+            'menu': family_info[house]['menu'],
+            'total_time': current_time
         })
-    
+
     return schedule
 
-def plot_route(graph, route):
+# Fungsi rute pulang
+def create_return_route(graph, route):
+    return_route = route[::-1] 
+    return_route.append(route[0])  
+    return return_route
+
+# Visualisasi rute pergi dan pulang
+def plot_combined_route(graph, route, return_route):
     G = nx.DiGraph()  
     for node, neighbors in graph.items():
         for neighbor, weight in neighbors.items():
             G.add_edge(node, neighbor, weight=weight)
     
-    pos = nx.spring_layout(G, seed=42) 
-    
-    color_map = ['skyblue' if node in route else 'lightgray' for node in G.nodes]
+    pos = nx.spring_layout(G, seed=42)  
     
     plt.figure(figsize=(12, 8))
-    nx.draw(G, pos, with_labels=True, node_color=color_map, node_size=2000, font_size=10, font_weight="bold", arrowsize=20)
+    nx.draw(G, pos, with_labels=True, node_color='lightgray', node_size=2000, font_size=10, font_weight="bold", arrowsize=20)
     nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G, 'weight'), font_color='red')
     
+    # jalur pergi dan pulang
     edges_in_route = [(route[i], route[i + 1]) for i in range(len(route) - 1)]
-    nx.draw_networkx_edges(G, pos, edgelist=edges_in_route, edge_color='blue', width=2.5)
+    edges_in_return = [(return_route[i], return_route[i + 1]) for i in range(len(return_route) - 1)]
     
-    plt.title("Rute Kunjungan Keluarga", fontsize=16)
+    # jalur pergi 
+    nx.draw_networkx_edges(G, pos, edgelist=edges_in_route, edge_color='blue', width=2.5, style='solid', label="Rute Pergi")
+    
+    # jalur pulang
+    nx.draw_networkx_edges(G, pos, edgelist=edges_in_return, edge_color='green', width=2.5, style='dashed', label="Rute Pulang")
+    
+    # Tambahkan garis manual untuk legenda
+    legend_elements = [
+        Line2D([0], [1], color='blue', lw=2.5, label="Rute Pergi"),
+        Line2D([0], [1], color='green', lw=2.5, linestyle='dashed', label="Rute Pulang")
+    ]
+    plt.legend(handles=legend_elements, loc="upper left")
+    
+    plt.title("Rute Kunjungan Pergi dan Pulang", fontsize=16)
     plt.show()
 
-start_node = 'Buyut Sutarji'
-distances, paths = dijkstra(graph, start_node)
-route = [start_node] + paths[max(paths, key=lambda k: distances[k])]
-thr_data = calculate_thr(family_info)
-schedule = create_schedule(graph, route, family_info)
+# Input pengguna
+vehicle_type = input("Masukkan jenis kendaraan (car/motorcycle/bicycle/walk): ").strip().lower()
+start_node = input("Masukkan titik awal keberangkatan: ").strip()
 
-print("THR Per Keluarga:")
-for family, thr in thr_data.items():
-    print(f"{family}: Rp {thr:,}")
+if start_node not in graph:
+    print("Titik awal tidak valid. Program dihentikan.")
+else:
+    # Algoritma Dijkstra
+    distances, paths = dijkstra(graph, start_node)
+    
+    # Jalur pergi menggunakan jalur dengan total jarak terpendek
+    end_node = max(paths, key=lambda k: distances[k])  #
+    route = [start_node] + paths[end_node]
 
-print("\nJadwal Kunjungan:")
-for visit in schedule:
-    print(f"Rumah: {visit['house']}, Waktu Tiba: {visit['arrival_time']}, Menu: {visit['menu']}")
+    # Jalur pulang dengan segmen tambahan ke titik awal
+    return_route = create_return_route(graph, route)
 
-plot_route(graph, route)
+    # Jadwal pergi
+    schedule = create_schedule(graph, route, family_info, vehicle_type)
 
+    # Jadwal pulang
+    return_schedule = create_schedule(graph, return_route, family_info, vehicle_type)
 
-#kendaraan dan kecepatan 
-#titik awal 
-# jenis kendaraan
-# akumulasi waktu
-# jalur pulang
+    # THR
+    thr_data = calculate_thr(family_info)
+
+    # Output THR
+    print("\nTHR Per Keluarga:")
+    for family, thr in thr_data.items():
+        print(f"{family}: Rp {thr:,}")
+
+    # Jadwal pergi
+    print("\nJadwal Kunjungan Pergi:")
+    for visit in schedule:
+        print(f"Rumah: {visit['house']}, Waktu Tiba: {visit['arrival_time']}, Menu: {visit['menu']}")
+    print(f"Total waktu perjalanan pergi: {schedule[-1]['total_time']} menit")
+
+    # Jadwal pulang
+    print("\nJadwal Kunjungan Pulang:")
+    for visit in return_schedule:
+        print(f"Rumah: {visit['house']}, Waktu Tiba: {visit['arrival_time']}, Menu: {visit['menu']}")
+    print(f"Total waktu perjalanan pulang: {return_schedule[-1]['total_time']} menit")
+
+    # Plot rute gabungan
+    plot_combined_route(graph, route, return_route)
