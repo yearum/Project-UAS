@@ -1,14 +1,14 @@
+import heapq
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import heapq
 
-# definisi graf
+# Definisi graf
 graph = {
     'Buyut Sutarji': {'Kakek Jais': 10, 'Kakek Suwito': 15},
     'Kakek Jais': {'Pak Joko': 5, 'Pak Toni': 12},
-    'Kakek Suwito': {'Bu Ani': 8, 'Pak Budi': 20},
-    'Pak Joko': {'Mbah Painem': 7},
+    'Kakek Suwito': {'Bu Ani': 30, 'Pak Budi': 20},
+    'Pak Joko': {'Mbah Painem': 25},
     'Pak Toni': {'Mbah Sutini': 10},
     'Bu Ani': {'Pakde Sunaryo': 12},
     'Pak Budi': {'Pakde Sunaryo': 9},
@@ -17,168 +17,131 @@ graph = {
     'Pakde Sunaryo': {}
 }
 
-# informasi keluarga
-family_info = {
-    'Buyut Sutarji': {'level': 0, 'menu': 'Nasi Tumpeng', 'pendapatan': 12_000_000, 'anak': 3},
-    'Kakek Jais': {'level': 1, 'menu': 'Soto Ayam', 'pendapatan': 10_000_000, 'anak': 1},
-    'Kakek Suwito': {'level': 1, 'menu': 'Gudeg', 'pendapatan': 14_000_000, 'anak': 2},
-    'Pak Joko': {'level': 2, 'menu': 'Rawon', 'pendapatan': 8_000_000, 'anak': 2},
-    'Pak Toni': {'level': 2, 'menu': 'Sate', 'pendapatan': 12_000_000, 'anak': 0},
-    'Bu Ani': {'level': 2, 'menu': 'Lontong Sayur', 'pendapatan': 15_000_000, 'anak': 1},
-    'Pak Budi': {'level': 2, 'menu': 'Bakso', 'pendapatan': 9_000_000, 'anak': 0},
-    'Mbah Painem': {'level': 3, 'menu': 'Soto Ayam', 'pendapatan': 8_000_000, 'anak': 0},
-    'Mbah Sutini': {'level': 3, 'menu': 'Nasi Tumpeng', 'pendapatan': 15_000_000, 'anak': 1},
-    'Pakde Sunaryo': {'level': 3, 'menu': 'Gado-Gado', 'pendapatan': 5_000_000, 'anak': 0}
-}
-
-# informasi kendaraan
+# Informasi kendaraan
 vehicles = {
-    'car': 60,  
-    'motorcycle': 40,
-    'bicycle': 15,
-    'walk': 5
+    'mobil': 30,  
+    'motor': 15,
+    'sepeda': 40,
+    'jalan': 60
 }
 
-# algoritma Dijkstra
+# Algoritma Dijkstra
 def dijkstra(graph, start):
     distances = {node: float('inf') for node in graph}
     distances[start] = 0
     priority_queue = [(0, start)]
-    path = {node: [] for node in graph}
-    
+    path = {node: None for node in graph}  
+
     while priority_queue:
         current_distance, current_node = heapq.heappop(priority_queue)
-        
+
         if current_distance > distances[current_node]:
             continue
-        
+
         for neighbor, weight in graph[current_node].items():
             distance = current_distance + weight
             if distance < distances[neighbor]:
                 distances[neighbor] = distance
-                path[neighbor] = path[current_node] + [neighbor]
+                path[neighbor] = current_node  
                 heapq.heappush(priority_queue, (distance, neighbor))
-    
+
     return distances, path
 
-# perhitungan THR
-def calculate_thr(family_info):
-    thr_data = {}
-    for family, info in family_info.items():
-        if info['pendapatan'] > 10_000_000 and info['anak'] > 0:
-            thr_data[family] = info['anak'] * 50_000
+# rute terpendek 
+def shortest_path(path, start, end):
+    route = []
+    current = end
+    while current is not None:
+        route.append(current)
+        current = path[current]  
+    return route[::-1]  
+
+def interactive_travel(graph, vehicle_type, start_node):
+    current_node = start_node
+    total_travel_time = 0
+
+    while True:
+        print(f"\nAnda sekarang di: {current_node}")
+        print("Apakah Anda ingin:")
+        print("1. Melanjutkan perjalanan")
+        print("2. Pulang")
+        choice = input("Masukkan pilihan Anda (1/2): ").strip()
+
+        if choice == "1":
+            print("Pilih tujuan berikut:")
+            neighbors = graph[current_node]
+            for i, neighbor in enumerate(neighbors.keys(), start=1):
+                print(f"{i}. {neighbor}")
+
+            try:
+                next_choice = int(input("Masukkan nomor tujuan: ").strip())
+                next_node = list(neighbors.keys())[next_choice - 1]
+            except (ValueError, IndexError):
+                print("Pilihan tidak valid. Silakan coba lagi.")
+                continue
+
+            travel_time = neighbors[next_node] / (vehicles[vehicle_type] * 1000 / 60)
+            total_travel_time += travel_time
+            print(f"Berpindah ke {next_node}. Waktu tempuh: {travel_time:.2f} menit.")
+            current_node = next_node
+
+        elif choice == "2":
+            print("Anda memilih pulang.")
+            print("Pilih titik akhir pulang dari daftar berikut:")
+            for i, node in enumerate(graph.keys(), start=1):
+                print(f"{i}. {node}")
+
+            try:
+                end_choice = int(input("Masukkan nomor titik akhir pulang: ").strip())
+                end_node = list(graph.keys())[end_choice - 1]
+            except (ValueError, IndexError):
+                print("Pilihan tidak valid. Program dihentikan.")
+                break
+
+            # rute pulang
+            print(f"Menentukan rute pulang dari {current_node} ke {end_node}...")
+            distances, path = dijkstra(graph, current_node)
+            shortest_route = shortest_path(path, current_node, end_node)
+
+            print(f"Rute pulang: {' -> '.join(shortest_route)}")
+            plot_graph(graph, shortest_route, start_node, end_node)
+            break
+
         else:
-            thr_data[family] = 0
-    return thr_data
+            print("Pilihan tidak valid. Silakan coba lagi.")
 
-# jadwal kunjungan
-def create_schedule(graph, route, family_info, vehicle_type):
-    schedule = []
-    current_time = 0  
-    vehicle_speed = vehicles[vehicle_type] * 1000 / 60  
-
-    for i, house in enumerate(route):
-        travel_time = 0
-        if i > 0:  
-            distance = graph[route[i - 1]].get(house, 0)  
-            travel_time = distance / vehicle_speed  
-
-        visit_time = 30 if family_info[house]['level'] == 0 else 15 
-
-        current_time += travel_time
-        arrival_time = f"{int(current_time // 60):02}:{int(current_time % 60):02}"  
-        current_time += visit_time
-
-        schedule.append({
-            'house': house,
-            'arrival_time': arrival_time,
-            'menu': family_info[house]['menu'],
-            'total_time': current_time
-        })
-
-    return schedule
-
-# Fungsi rute pulang
-def create_return_route(graph, route):
-    return_route = route[::-1] 
-    return_route.append(route[0])  
-    return return_route
-
-# Visualisasi rute pergi dan pulang
-def plot_combined_route(graph, route, return_route):
-    G = nx.DiGraph()  
+def plot_graph(graph, shortest_route=None, start_node=None, end_node=None):
+    G = nx.DiGraph()
     for node, neighbors in graph.items():
         for neighbor, weight in neighbors.items():
             G.add_edge(node, neighbor, weight=weight)
-    
+
     pos = nx.spring_layout(G, seed=42)  
-    
     plt.figure(figsize=(12, 8))
-    nx.draw(G, pos, with_labels=True, node_color='lightgray', node_size=2000, font_size=10, font_weight="bold", arrowsize=20)
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=3000, font_size=10, font_weight="bold", arrowsize=20)
     nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G, 'weight'), font_color='red')
-    
-    # jalur pergi dan pulang
-    edges_in_route = [(route[i], route[i + 1]) for i in range(len(route) - 1)]
-    edges_in_return = [(return_route[i], return_route[i + 1]) for i in range(len(return_route) - 1)]
-    
-    # jalur pergi 
-    nx.draw_networkx_edges(G, pos, edgelist=edges_in_route, edge_color='blue', width=2.5, style='solid', label="Rute Pergi")
-    
-    # jalur pulang
-    nx.draw_networkx_edges(G, pos, edgelist=edges_in_return, edge_color='green', width=2.5, style='dashed', label="Rute Pulang")
-    
-    # Tambahkan garis manual untuk legenda
-    legend_elements = [
-        Line2D([0], [1], color='blue', lw=2.5, label="Rute Pergi"),
-        Line2D([0], [1], color='green', lw=2.5, linestyle='dashed', label="Rute Pulang")
-    ]
-    plt.legend(handles=legend_elements, loc="upper left")
-    
-    plt.title("Rute Kunjungan Pergi dan Pulang", fontsize=16)
+
+    if shortest_route:
+        route_edges = list(zip(shortest_route, shortest_route[1:]))
+        nx.draw_networkx_edges(G, pos, edgelist=route_edges, edge_color='green', width=2)
+
+    # titik awal dan tujuan
+    if start_node and end_node:
+        nx.draw_networkx_nodes(G, pos, nodelist=[start_node], node_color='yellow', node_size=500)
+        nx.draw_networkx_nodes(G, pos, nodelist=[end_node], node_color='red', node_size=500)
+
+    plt.title("Graf Perjalanan Keluarga", fontsize=16)
     plt.show()
 
-# Input pengguna
-vehicle_type = input("Masukkan jenis kendaraan (car/motorcycle/bicycle/walk): ").strip().lower()
+vehicle_type = input("Masukkan jenis kendaraan (mobil/motor/sepeda/jalan): ").strip().lower()
 start_node = input("Masukkan titik awal keberangkatan: ").strip()
+end_node = input("Masukkan titik akhir: ").strip()
 
 if start_node not in graph:
     print("Titik awal tidak valid. Program dihentikan.")
 else:
-    # Algoritma Dijkstra
-    distances, paths = dijkstra(graph, start_node)
-    
-    # Jalur pergi menggunakan jalur dengan total jarak terpendek
-    end_node = max(paths, key=lambda k: distances[k])  #
-    route = [start_node] + paths[end_node]
+    plot_graph(graph)  
+    interactive_travel(graph, vehicle_type, start_node)
 
-    # Jalur pulang dengan segmen tambahan ke titik awal
-    return_route = create_return_route(graph, route)
-
-    # Jadwal pergi
-    schedule = create_schedule(graph, route, family_info, vehicle_type)
-
-    # Jadwal pulang
-    return_schedule = create_schedule(graph, return_route, family_info, vehicle_type)
-
-    # THR
-    thr_data = calculate_thr(family_info)
-
-    # Output THR
-    print("\nTHR Per Keluarga:")
-    for family, thr in thr_data.items():
-        print(f"{family}: Rp {thr:,}")
-
-    # Jadwal pergi
-    print("\nJadwal Kunjungan Pergi:")
-    for visit in schedule:
-        print(f"Rumah: {visit['house']}, Waktu Tiba: {visit['arrival_time']}, Menu: {visit['menu']}")
-    print(f"Total waktu perjalanan pergi: {schedule[-1]['total_time']} menit")
-
-    # Jadwal pulang
-    print("\nJadwal Kunjungan Pulang:")
-    for visit in return_schedule:
-        print(f"Rumah: {visit['house']}, Waktu Tiba: {visit['arrival_time']}, Menu: {visit['menu']}")
-    print(f"Total waktu perjalanan pulang: {return_schedule[-1]['total_time']} menit")
-
-    # Plot rute gabungan
-    plot_combined_route(graph, route, return_route)
+distances, path = dijkstra(graph, "Buyut Sutarji")
+print(shortest_path(path, "Buyut Sutarji", "Kakek Jais"))
